@@ -20,8 +20,8 @@ package rsge.po;
 /** PaymentRule AD_Reference_ID=1000111 */
 public enum X_Ref__Down_Payment_Rule 
 {
-    /** Cash = B */
-    CASH("B"),
+    /** Down Payment = D */
+    DOWN_PAYMENT("D"),
     /** Check = S */
     CHECK("S"),
     /** Direct Deposit = T */

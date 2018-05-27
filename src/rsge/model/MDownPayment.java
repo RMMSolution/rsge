@@ -23,6 +23,7 @@ import org.compiere.process.DocumentEngine;
 import org.compiere.util.Ctx;
 import org.compiere.util.DB;
 import org.compiere.util.Env.QueryParams;
+import org.compiere.util.Msg;
 import org.compiere.util.Trx;
 import org.compiere.vos.DocActionConstants;
 
@@ -103,11 +104,25 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 			setPercentage(BigDecimal.ZERO);
 			
 			// Get Tax Ratio
+			System.out.println("OK NOW");
 			BigDecimal taxRatio = BigDecimal.ZERO;
-			if(getGrandTotal().subtract(getTotalAmt()).signum()>0)
-				taxRatio = (getGrandTotal().subtract(getTotalAmt())).divide(getGrandTotal(), 2, RoundingMode.HALF_EVEN);
-			trxPayment = (getDPAmount().multiply(BigDecimal.ONE.subtract(taxRatio))).setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
-			taxPayment = getDPAmount().subtract(trxPayment);			
+			System.out.println("Grand Total " + getGrandTotal() + ", TotalAmt " + getTotalAmt());
+			if(getGrandTotal().compareTo(getTotalAmt())!=0)
+			{
+				System.out.println("HERE");
+				taxRatio = getTotalAmt().divide(getGrandTotal(), 4, RoundingMode.HALF_EVEN);
+				System.out.println("Tax Ratio "+ taxRatio);
+				trxPayment = (getDPAmount().multiply(taxRatio)).setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
+				System.out.println("Trx Payment " + trxPayment);
+				taxPayment = getDPAmount().subtract(trxPayment);
+				System.out.println("Tax Payment " + taxPayment);
+			}
+			else
+			{
+				System.out.println("Should be here");
+				trxPayment = getDPAmount();
+				taxPayment = BigDecimal.ZERO;
+			}
 		}		
 		
 		setDPTrxAmount(trxPayment);
@@ -120,47 +135,6 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 	@Override
 	protected boolean afterSave(boolean newRecord, boolean success) {
 		// TODO Auto-generated method stub
-		if(getTotalAmt().signum()!=0)
-		{
-			if(!isDPPercentage() && !isDPFixedAmt())
-			{
-				String update = "UPDATE XX_DownPaymentOrder " +
-						"SET DPAmount = 0, TaxAmt = 0 " +
-						"WHERE XX_DownPayment_ID = ?";
-				DB.executeUpdate(get_Trx(), update, getXX_DownPayment_ID());
-			}
-			else
-			{
-				MDownPaymentOrder[] list = getDownPaymentOrder();
-				for(MDownPaymentOrder dpo : list)
-				{
-					MOrder order = new MOrder(getCtx(), dpo.getC_Order_ID(), get_Trx());
-					BigDecimal dpAmt = BigDecimal.ZERO;
-					BigDecimal dpTaxAmt = BigDecimal.ZERO;
-					if(isDPPercentage())
-						dpAmt = calculateDPPercentage(this, order);
-					else if(isDPFixedAmt())
-					{
-						if(dpo.getTotalLines().signum()!=0)
-						{				
-							BigDecimal ratio = dpo.getGrandTotal().divide(getGrandTotal(), 4, RoundingMode.HALF_EVEN);
-							BigDecimal allocatedAmt = getTotalDPAmount().multiply(ratio);
-							dpAmt = allocatedAmt;
-						}
-					}
-					
-					// Set Scale based on currency
-					MCurrency currency = new MCurrency(getCtx(), getC_Currency_ID(), get_Trx());
-					dpAmt = dpAmt.setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
-					dpTaxAmt = dpTaxAmt.setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
-					
-					dpo.setDPAmount(dpAmt);
-					dpo.save();
-				}
-				
-			}
-			
-		}
 		return true;
 	}
 	
@@ -214,6 +188,38 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 	
 	@Override
 	public String completeIt() {
+		// Allocate down payment
+		if(getTotalAmt().signum()!=0)
+		{
+			MDownPaymentOrder[] list = getDownPaymentOrder();
+			for(MDownPaymentOrder dpo : list)
+			{
+				MOrder order = new MOrder(getCtx(), dpo.getC_Order_ID(), get_Trx());
+				BigDecimal dpAmt = BigDecimal.ZERO;
+				BigDecimal reservedAmt = BigDecimal.ZERO;
+				if(isDPPercentage())
+				{
+					dpAmt = calculateDPPercentage(this, order);
+				}
+				else if(isDPFixedAmt())
+				{
+					BigDecimal ratio = dpo.getGrandTotal().divide(getGrandTotal(), 4, RoundingMode.HALF_EVEN);
+					dpAmt = ratio.multiply(getTotalDPAmount());					
+				}
+				reservedAmt = dpAmt;
+				
+				// 
+				if(dpo.getMaxAllocationPct().compareTo(BigDecimal.valueOf(100))<0)
+					dpAmt = (dpAmt.multiply(dpo.getMaxAllocationPct())).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_EVEN);
+				
+				// Set Scale based on currency
+				MCurrency currency = new MCurrency(getCtx(), getC_Currency_ID(), get_Trx());
+				dpAmt = dpAmt.setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);				
+				reservedAmt = reservedAmt.setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);				
+				dpo.setDPAmount(dpAmt);
+				dpo.save();
+			}		
+		}
 
 		if(lines==null)
 			lines = getLines();
@@ -228,7 +234,7 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 			{
 				MDownPaymentPlan dpp = new MDownPaymentPlan(getCtx(), lines.get(i), get_Trx());
 				// Create Payment
-				if(!dpp.getPaymentRule().equals(X_XX_DownPaymentPlan.PAYMENTRULE_Cash))
+				if(!dpp.getPaymentRule().equals(X_XX_DownPaymentPlan.PAYMENTRULE_DownPayment))
 				{
 					StringBuilder description = new StringBuilder();
 					if(dpp.getPaymentRule().equals(X_XX_DownPaymentPlan.PAYMENTRULE_Check))
@@ -248,12 +254,49 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 					DocumentEngine.processIt(payment, X_C_Payment.DOCACTION_Complete);
 					payment.save();
 				}
+				else if(dpp.getPaymentRule().equals(X_XX_DownPaymentPlan.PAYMENTRULE_DownPayment))
+				{
+					MDownPayment[] dpList = MDownPaymentPlan.unAllocatedDownPayment(getCtx(), getC_BPartner_ID(), get_Trx());
+					BigDecimal distAmt = dpp.getAllocatedAmt();
+					for(MDownPayment odp : dpList)
+					{
+						BigDecimal availAmt = odp.getPayAmt().subtract(odp.getAllocatedAmt());
+						MOtherDPAllocation oda = new MOtherDPAllocation(getCtx(), 0, get_Trx());
+						oda.setClientOrg(dpp);
+						oda.setXX_DownPaymentPlan_ID(dpp.getXX_DownPaymentPlan_ID());
+						oda.setXX_DownPayment_ID(odp.getXX_DownPayment_ID());
+						BigDecimal allocatedAmt = BigDecimal.ZERO;
+						if(availAmt.compareTo(distAmt)<=0)
+							allocatedAmt = availAmt;
+						else
+							allocatedAmt = distAmt;
+						oda.setDPAmount(distAmt);
+						if(oda.save())
+							distAmt = distAmt.subtract(allocatedAmt);
+						if(distAmt.signum()<=0)
+							break;
+					}
+				
+					
+				}
 				dpp.setProcessed(true);
 				dpp.save();
 			}
-			
 		}		
+		
+		// Update ReservedAmt
+		updateReservedAmt(this);
 		return DocActionConstants.STATUS_Completed;
+	}
+	
+	public static boolean updateReservedAmt(MDownPayment dp)
+	{
+		BigDecimal reservedAmt = MDownPaymentOrder.getDownPaymentReserved(dp).add(MOtherDPAllocation.getDownPaymentReserved(dp));
+		String update = "UPDATE XX_DownPayment " +
+				"SET ReservedAmt = ? " +
+				"WHERE XX_DownPayment_ID = ? ";
+		DB.executeUpdate(dp.get_Trx(), update, reservedAmt, dp.getXX_DownPayment_ID());		
+		return true;
 	}
 	
 	public static boolean updateDownPayment(MDownPayment dp, BigDecimal dpAmount, BigDecimal totalLines, BigDecimal grandTotal)
@@ -273,8 +316,8 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 		else if(dp.isDPFixedAmt())
 		{
 			// Convert to Percentage
-			BigDecimal percentage = dp.getDPAmount().divide(dp.getGrandTotal(), 2, RoundingMode.HALF_EVEN);
-			dpAmt = percentage.multiply(totalLines).setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
+			BigDecimal percentage = totalLines.divide(dp.getGrandTotal(), 2, RoundingMode.HALF_EVEN);
+			dpAmt = percentage.multiply(dpAmount).setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
 		}
 		BigDecimal totalDPAmt = BigDecimal.ZERO;		
 		if(dp.isDPPercentage())
@@ -471,7 +514,8 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 		return null;
 	}
 
-	String m_processMsg;
+	/**	Process Message 			*/
+	private String		m_processMsg = null;
 
 	@Override
 	public String getProcessMsg() {
@@ -487,19 +531,25 @@ public class MDownPayment extends X_XX_DownPayment implements DocAction{
 	}	//	getSummary
 
 	@Override
-	public boolean invalidateIt() {
+	public boolean invalidateIt()
+	{
 		log.info(toString());
+		setDocAction(DOCACTION_Prepare);		
 		return true;
 	}	//	invalidateIt
 
 	@Override
 	public String prepareIt() {
-		
 		lines = getLines();
 		if(lines.size()==0)
 		{
 			log.saveError("NoLines", "No Payment Plan");
 			return "@NoLines@";
+		}
+		if(getTotalDPAmount().compareTo(getPayAmt())!=0)
+		{
+			m_processMsg = Msg.getMsg(getCtx(), "Total down payment must have exact amount as Payment amount");
+			return DocActionConstants.STATUS_Invalid;
 		}
 		
 		return DocActionConstants.STATUS_InProgress;

@@ -56,9 +56,9 @@ public class X_XX_DownPaymentSettlementLn extends PO
         
     }
     /** Serial Version No */
-    private static final long serialVersionUID = 27806228238305L;
-    /** Last Updated Timestamp 2018-04-19 08:55:21.516 */
-    public static final long updatedMS = 1524102921516L;
+    private static final long serialVersionUID = 27809534032199L;
+    /** Last Updated Timestamp 2018-05-27 15:11:55.41 */
+    public static final long updatedMS = 1527408715410L;
     /** AD_Table_ID=1000143 */
     public static final int Table_ID;
     
@@ -130,6 +130,24 @@ public class X_XX_DownPaymentSettlementLn extends PO
     public int getC_Order_ID() 
     {
         return get_ValueAsInt("C_Order_ID");
+        
+    }
+    
+    /** Set Down Payment.
+    @param XX_DownPayment_ID Down payment of an order */
+    public void setXX_DownPayment_ID (int XX_DownPayment_ID)
+    {
+        if (XX_DownPayment_ID <= 0) set_Value ("XX_DownPayment_ID", null);
+        else
+        set_Value ("XX_DownPayment_ID", Integer.valueOf(XX_DownPayment_ID));
+        
+    }
+    
+    /** Get Down Payment.
+    @return Down payment of an order */
+    public int getXX_DownPayment_ID() 
+    {
+        return get_ValueAsInt("XX_DownPayment_ID");
         
     }
     

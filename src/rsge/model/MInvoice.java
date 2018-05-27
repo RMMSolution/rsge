@@ -288,8 +288,8 @@ public class MInvoice extends org.compiere.model.MInvoice {
     @Override
     public String completeIt() {
     	// Check Down Payment
-    	if(super.completeIt().equals(DocActionConstants.STATUS_Completed))
-    	{
+//    	if(super.completeIt().equals(DocActionConstants.STATUS_Completed))
+//    	{
 //    		 Update Down Payment (if exists)    		
     		BigDecimal dpAmt = SettleInvoiceDownPayment.settleDownPayment(getCtx(), getC_Invoice_ID(), get_Trx());
     		BigDecimal remains = getGrandTotal().subtract(dpAmt);
@@ -297,19 +297,19 @@ public class MInvoice extends org.compiere.model.MInvoice {
     		setDPAmount(dpAmt);
     		if(remains.signum()==0)
     			setIsPaid(true);
-    	}
-    	
-    	if(isSOTrx() && getRemainingAmt().signum()!=0)
-    	{
-    		MCurrency currency = new MCurrency(getCtx(), getC_Currency_ID(), get_Trx());
-    		String sayInWord = AmtInWords_IN.sayNumber(getRemainingAmt().doubleValue(), currency.getDescription());
-    		if(sayInWord!=null)
-    			setRSGESayInWordInd(sayInWord);
-    	}
-    	
-    	// Calculate Budget 
-    	if(!isSOTrx() && !isReturnTrx())
-    		updateBudgetTrx(this);
+//    	}
+//    	
+//    	if(isSOTrx() && getRemainingAmt().signum()!=0)
+//    	{
+//    		MCurrency currency = new MCurrency(getCtx(), getC_Currency_ID(), get_Trx());
+//    		String sayInWord = AmtInWords_IN.sayNumber(getRemainingAmt().doubleValue(), currency.getDescription());
+//    		if(sayInWord!=null)
+//    			setRSGESayInWordInd(sayInWord);
+//    	}
+//    	
+//    	// Calculate Budget 
+//    	if(!isSOTrx() && !isReturnTrx())
+//    		updateBudgetTrx(this);
     	
     	return DocActionConstants.STATUS_Completed;
     }
@@ -344,12 +344,9 @@ public class MInvoice extends org.compiere.model.MInvoice {
     		pstmt.close();
     	}catch (Exception e) {
     		e.printStackTrace();
-		}
-    	
+		}    	
     	return true;
-    }
-    
-    
+    }    
     
     public BigDecimal getGrandTotalAmt(BigDecimal serviceChargeAmt, BigDecimal invoiceDiscAmt)
     {

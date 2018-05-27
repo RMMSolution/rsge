@@ -337,8 +337,6 @@ public class MOrder extends org.compiere.model.MOrder {
 						BigDecimal unrealizedAmt = lineQty.multiply(poPrice); 
 						prline.setUnrealizedAmt(unrealizedAmt);
 
-						MOrg org = new MOrg(pr.getCtx(), prline.getAD_Org_ID(), pr.get_Trx());
-						System.out.println("PR Organization " + org.getName());
 						MBudgetTransactionLine bline = MBudgetTransactionLine.createLine(line.getCtx(), line.get_Table_ID(), line.getC_OrderLine_ID(), 
 								prline.get_Table_ID(), prline.getXX_PurchaseRequisitionLine_ID(), prline.getAD_Org_ID(), pr.getDateDoc(), prline.getAccount_ID(), 
 								0, prline.getC_Activity_ID(), 0, pr.getC_Campaign_ID(), 0, 0, pr.getC_Project_ID(), 0, 0, 0, prline.getM_Product_ID(), 0, 0, 0, 0, 0, line.get_Trx());

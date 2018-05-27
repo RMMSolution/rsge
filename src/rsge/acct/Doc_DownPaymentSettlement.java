@@ -7,16 +7,18 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.logging.Level;
 
 import org.compiere.acct.Doc;
 import org.compiere.acct.Fact;
 import org.compiere.model.MAccount;
 import org.compiere.model.MAcctSchema;
-import org.compiere.model.MCharge;
 import org.compiere.model.MCurrency;
 import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
+import org.compiere.model.MTax;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Trx;
@@ -84,27 +86,20 @@ public class Doc_DownPaymentSettlement extends Doc {
 		Fact fact = new Fact(this, as, Fact.POST_Actual);
 		MDownPaymentSettlementLn[] lines = getLines(); 
 		MAccount bpAcct = null;
-		int acctType = 0;
 		MCurrency currency = new MCurrency(getCtx(), dps.getC_Currency_ID(), getTrx());
 
 		if(dps.isSOTrx())
 		{
-			System.out.println("START NOW");
-			boolean hasDPInvoice = false;
 			bpAcct = getAccount(Doc.ACCTTYPE_C_Receivable, as);
 			if(dps.isManual())
 			{
-				System.out.println("OK IS MANUAL");
 				// Get Down Payment
 				MDownPaymentOrderAlloc[] dpLocList = getDownPaymentOrderAlloc();
-				System.out.println("dpLocList size " + dpLocList);
 				for(MDownPaymentOrderAlloc dploc : dpLocList)
 				{
-					System.out.println("OK NOW");
 					MDownPayment dp = new MDownPayment(getCtx(), dploc.getXX_DownPayment_ID(), getTrx());
 					MChargeAcct ca = MChargeAcct.get(dp.getC_Charge_ID(), as);					
 					MAccount account = MAccount.get(getCtx(), ca.getCh_Revenue_Acct());
-					System.out.println("DPLoc AllocatedAmt " + dploc.getAllocatedAmt());
 					fact.createLine(null, account, dps.getC_Currency_ID(), dploc.getAllocatedAmt(), null);					
 				}
 			}
@@ -125,7 +120,6 @@ public class Doc_DownPaymentSettlement extends Doc {
 					MAccount chargeAcct = null;
 					if(line.getC_Invoice_ID()!=0)
 					{
-						hasDPInvoice = true;
 						// Get Charge
 						int chargeID = 0;
 						String sql = "SELECT il.C_Charge_ID FROM C_InvoiceLine il "
@@ -150,18 +144,13 @@ public class Doc_DownPaymentSettlement extends Doc {
 					for(MOrderLine oLine : oLines)
 					{
 						BigDecimal allocatedAmt = BigDecimal.ZERO;
+						BigDecimal taxAmt = BigDecimal.ZERO;
+						
 						MAccount account = null;
 						if(chargeAcct==null)
 						{
-							System.out.println("Should be here");
-//							if(oLine.getM_Product_ID()!=0)
-//								acctType = DocBaseType.ACCTTYPE_ProductCustomerPrepayment;
-//							else if(oLine.getC_Charge_ID()!=0)
-//								acctType = DocBaseType.ACCTTYPE_ChargeCustomerPrepayment;
 							int dpCharge = MDownPayment.getDownPaymentCharge(oLine.getC_Order_ID(), getTrx());
-							System.out.println("Charge name : " + new MCharge(getCtx(), dpCharge, getTrx()).getName());
 							chargeAcct = DocBaseType.getAccount(DocBaseType.ACCTTYPE_Charge, 0, dpCharge, as);
-//							account = MAccount.get(getCtx(), DocBaseType.getValidCombination_ID(acctType, oLine.getM_Product_ID(), oLine.getC_Charge_ID(), as));						
 						}
 
 						account = chargeAcct;
@@ -174,21 +163,38 @@ public class Doc_DownPaymentSettlement extends Doc {
 						}
 						else
 							allocatedAmt = distAmount;
+						
+						BigDecimal trxPlusTax = BigDecimal.valueOf(100);
+						BigDecimal taxRate = BigDecimal.ZERO;
+						if(oLine.getC_Tax_ID()!=0)
+						{
+							MTax t = new MTax(getCtx(), oLine.getC_Tax_ID(), getTrx());
+							taxRate = t.getRate();
+							if(t.getRate().signum()!=0)
+								trxPlusTax = trxPlusTax.add(taxRate);
+						}
+						
+						if(taxRate.signum()!=0)
+						{
+							BigDecimal multiplier = allocatedAmt.divide(trxPlusTax, 4, RoundingMode.HALF_EVEN);
+							allocatedAmt = multiplier.multiply(BigDecimal.valueOf(100));
+							allocatedAmt = allocatedAmt.setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
+							taxAmt = multiplier.multiply(taxRate);
+							taxAmt = taxAmt.setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
+						}
 						fact.createLine(null, account, dps.getC_Currency_ID(), allocatedAmt, null);
+						if(taxAmt.signum()!=0)
+							fact.createLine(null, getTaxAccount(oLine.getC_Tax_ID(), as), dps.getC_Currency_ID(), taxAmt, null);
+
 						n++;
 					}
 					
 				}
-//				if(!hasDPInvoice)
-//					fact.createLine(null, bpAcct, dps.getC_Currency_ID(), null, dps.getInvoiceAmt());
-				
 			}
 		}
 		else
 		{
-			System.out.println("HERE");
 			bpAcct = getAccount(Doc.ACCTTYPE_V_Liability, as);			
-			System.out.println(dps.getInvoiceAmt());
 			fact.createLine(null, bpAcct, dps.getC_Currency_ID(), dps.getInvoiceAmt(), null);			
 			for(MDownPaymentSettlementLn line : lines)
 			{
@@ -204,13 +210,17 @@ public class Doc_DownPaymentSettlement extends Doc {
 				for(MOrderLine oLine : oLines)
 				{
 					BigDecimal allocatedAmt = BigDecimal.ZERO;
-//					if(oLine.getM_Product_ID()!=0)
-//						acctType = DocBaseType.ACCTTYPE_ProductVendorPrepayment;
-//					else if(oLine.getC_Charge_ID()!=0)
-//						acctType = DocBaseType.ACCTTYPE_ChargeVendorPrepayment;
+					BigDecimal taxAmt = BigDecimal.ZERO;
+					BigDecimal taxRatio = BigDecimal.ZERO;
+					if(oLine.getC_Tax_ID()!=0)
+					{
+						MTax t = new MTax(getCtx(), oLine.getC_Tax_ID(), getTrx());
+						if(t.getRate().signum()!=0)
+							taxRatio = t.getRate().divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_EVEN);
+					}
+					
 					MChargeAcct ca = MChargeAcct.get(MDownPayment.getDownPaymentCharge(oLine.getC_Order_ID(), getTrx()), as);					
 					MAccount account = MAccount.get(getCtx(), ca.getCh_Expense_Acct());
-					System.out.println("Account " + account.getCombination());
 					if(n < size)
 					{
 						BigDecimal ratio = oLine.getLineNetAmt().divide(order.getTotalLines(), 4, RoundingMode.HALF_EVEN);
@@ -219,7 +229,16 @@ public class Doc_DownPaymentSettlement extends Doc {
 					}
 					else
 						allocatedAmt = distAmount;
+					if(taxRatio.signum()!=0)
+					{
+						taxAmt = allocatedAmt.multiply(taxRatio);
+						taxAmt = taxAmt.setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);
+						allocatedAmt = allocatedAmt.subtract(taxAmt);
+					}
 					fact.createLine(null, account, dps.getC_Currency_ID(), null, allocatedAmt);
+					if(taxAmt.signum()!=0)
+						fact.createLine(null, getTaxAccount(oLine.getC_Tax_ID(), as), dps.getC_Currency_ID(), null, taxAmt);
+
 					n++;
 				}
 				
@@ -297,6 +316,48 @@ public class Doc_DownPaymentSettlement extends Doc {
 		lines.toArray(retValue);
 		return retValue;
 	}
+
+	/**
+	 *	Get Account
+	 *  @param AcctType see ACCTTYPE_*
+	 *  @param as account schema
+	 *  @return Account
+	 */
+	private MAccount getTaxAccount (int C_Tax_ID, MAcctSchema as)
+	{		
+		String sql = "SELECT T_Due_Acct, T_Liability_Acct, T_Credit_Acct, T_Receivables_Acct "
+			+ "FROM C_Tax_Acct WHERE C_Tax_ID=? AND C_AcctSchema_ID=?";
+		int validCombination_ID = 0;
+		PreparedStatement pstmt =null;
+		ResultSet rs =null;
+		try
+		{
+			pstmt = DB.prepareStatement(sql,as.get_Trx());
+			pstmt.setInt(1, C_Tax_ID);
+			pstmt.setInt(2, as.getC_AcctSchema_ID());
+			rs = pstmt.executeQuery();
+			if (rs.next())
+			{
+				if(isSOTrx())
+					validCombination_ID = rs.getInt(2);    //  1..5
+				else
+					validCombination_ID = rs.getInt(4);    //  1..5
+			}
+		}
+		catch (SQLException e)
+		{
+			log.log(Level.SEVERE, sql, e);
+		}
+		finally
+		{
+			DB.closeResultSet(rs);
+			DB.closeStatement(pstmt);
+		}
+
+		if (validCombination_ID == 0)
+			return null;
+		return MAccount.get(as.getCtx(), validCombination_ID);
+	}   //  getAccount
 
 
 	 

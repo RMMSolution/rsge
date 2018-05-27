@@ -67,9 +67,9 @@ public class X_XX_DownPayment extends PO
         
     }
     /** Serial Version No */
-    private static final long serialVersionUID = 27807403664803L;
-    /** Last Updated Timestamp 2018-05-02 23:25:48.014 */
-    public static final long updatedMS = 1525278348014L;
+    private static final long serialVersionUID = 27809431904819L;
+    /** Last Updated Timestamp 2018-05-26 10:49:48.03 */
+    public static final long updatedMS = 1527306588030L;
     /** AD_Table_ID=1000138 */
     public static final int Table_ID;
     
@@ -675,6 +675,22 @@ public class X_XX_DownPayment extends PO
     public boolean isProcessing() 
     {
         return get_ValueAsBoolean("Processing");
+        
+    }
+    
+    /** Set Reserved Amount.
+    @param ReservedAmt Amount which already reserved by purchase requisition */
+    public void setReservedAmt (java.math.BigDecimal ReservedAmt)
+    {
+        set_Value ("ReservedAmt", ReservedAmt);
+        
+    }
+    
+    /** Get Reserved Amount.
+    @return Amount which already reserved by purchase requisition */
+    public java.math.BigDecimal getReservedAmt() 
+    {
+        return get_ValueAsBigDecimal("ReservedAmt");
         
     }
     

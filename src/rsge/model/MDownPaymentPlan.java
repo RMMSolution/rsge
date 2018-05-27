@@ -8,6 +8,7 @@ import java.math.RoundingMode;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 
 import org.compiere.api.UICallout;
 import org.compiere.model.MBankAccount;
@@ -96,24 +97,66 @@ public class MDownPaymentPlan extends X_XX_DownPaymentPlan {
 	protected boolean beforeSave(boolean newRecord) {
 		
 		MDownPayment dp = new MDownPayment(getCtx(), getXX_DownPayment_ID(), get_Trx());
-		MOrder order = new MOrder(getCtx(), dp.getC_Order_ID(), get_Trx());
-		if(is_ValueChanged("C_Currency_ID") || is_ValueChanged("C_ConversionType_ID"))
+		if(getPaymentRule().equals(PAYMENTRULE_DownPayment))
 		{
-			if(getC_Currency_ID()!=order.getC_Currency_ID())
-				setIsDifferentCurrency(true);
-			else
-				setIsDifferentCurrency(false);		
-			updateRate(order, dp.getDateTrx());
-		}
-		// Check if bank is in the same currency as Plan Currency. If not reset it
-		if(getC_BankAccount_ID()!=0)
-		{
-			MBankAccount ba = new MBankAccount(getCtx(), getC_BankAccount_ID(), get_Trx());
-			if(ba.getC_Currency_ID()!=getC_Currency_ID())
+			// Only one plan with payment rule down payment is allowed
+			if(newRecord)
 			{
-				log.saveError("Error", Msg.getMsg(getCtx(), "Bank Account Currency is invalid"));
+				if(!checkLineValidation())
+				{
+					log.saveError("Error", "Only one line allowed with payment rule of Down Payment");
+					return false;
+				}
+			}
+			
+			// Get unallocated amount
+			String sql = "SELECT COALESCE(SUM(PayAmt-ReservedAmt),0) AS Remains "
+					+ "FROM XX_DownPayment "
+					+ "WHERE DocStatus IN ('CO', 'CL') "
+					+ "AND C_BPartner_ID = ? "
+					+ "AND XX_DownPayment_ID != ? ";
+			PreparedStatement pstmt = DB.prepareStatement(sql, get_Trx());
+			ResultSet rs = null;
+			try{
+				pstmt.setInt(1, dp.getC_BPartner_ID());
+				pstmt.setInt(2, getXX_DownPayment_ID());
+				rs = pstmt.executeQuery();
+				if(rs.next())
+					setRemainingAmt(rs.getBigDecimal(1));
+				rs.close();
+				pstmt.close();
+			}catch (Exception e) {
+				// TODO: handle exception
+				e.printStackTrace();
+			}
+			
+			if(getAllocatedAmt().compareTo(getRemainingAmt())>0)
+			{
+				log.saveError("Error", "Allocated amount cannot be bigger than remaining amount");
 				return false;
 			}
+		}
+		else if(getPaymentRule().equals(PAYMENTRULE_Check)||getPaymentRule().equals(PAYMENTRULE_DirectDeposit))
+		{
+			MOrder order = new MOrder(getCtx(), dp.getC_Order_ID(), get_Trx());
+			if(is_ValueChanged("C_Currency_ID") || is_ValueChanged("C_ConversionType_ID"))
+			{
+				if(getC_Currency_ID()!=order.getC_Currency_ID())
+					setIsDifferentCurrency(true);
+				else
+					setIsDifferentCurrency(false);		
+				updateRate(order, dp.getDateTrx());
+			}
+			// Check if bank is in the same currency as Plan Currency. If not reset it
+			if(getC_BankAccount_ID()!=0)
+			{
+				MBankAccount ba = new MBankAccount(getCtx(), getC_BankAccount_ID(), get_Trx());
+				if(ba.getC_Currency_ID()!=getC_Currency_ID())
+				{
+					log.saveError("Error", Msg.getMsg(getCtx(), "Bank Account Currency is invalid"));
+					return false;
+				}
+			}			
 		}
 
 		//		// Make sure allocated amount is not exceed total down payment
@@ -125,54 +168,76 @@ public class MDownPaymentPlan extends X_XX_DownPaymentPlan {
 //		else
 //			setIsDifferentCurrency(false);			
 
-		BigDecimal totalAllocation = BigDecimal.ZERO;
 		BigDecimal allocationAmt = BigDecimal.ZERO;
 		
-		if(dp.isSeparateTaxPayment())
-		{
-			// Check Trx and Tax Payment
-			totalAllocation = getAllocatedPayment(isTrxPayment(), isTaxPayment());
-			if(isTrxPayment())
-			{
-				if(dp.getDPTrxAmount().compareTo(totalAllocation.add(getAllocatedAmt()))<0)
-				{
-					allocationAmt = dp.getDPTrxAmount().subtract(totalAllocation);
-				}
-			}
-			else if(isTaxPayment())
-			{
-				if(dp.getDPTaxAmount().compareTo(totalAllocation.add(getAllocatedAmt()))<0)
-				{
-					allocationAmt = dp.getDPTaxAmount().subtract(totalAllocation);
-				}
-			}
-			else if(!isTrxPayment() && !isTaxPayment())
-			{
-				log.saveError("Error", Msg.getMsg(getCtx(), "TrxPayment or Tax Payment must be select"));
-				return false;
-			}
-		}
-		else
-		{
-//			totalAllocation = getAllocatedPayment(true, true);
-//			if(dp.getTotalDPAmount().compareTo(totalAllocation.add(getAllocatedAmt()))<0)
+//		if(dp.isSeparateTaxPayment())
+//		{
+//			// Check Trx and Tax Payment
+//			totalAllocation = getAllocatedPayment(isTrxPayment(), isTaxPayment());
+//			if(isTrxPayment())
 //			{
-//				allocationAmt = dp.getTotalDPAmount().subtract(totalAllocation);
+//				if(dp.getDPTrxAmount().compareTo(totalAllocation.add(getAllocatedAmt()))<0)
+//				{
+//					allocationAmt = dp.getDPTrxAmount().subtract(totalAllocation);
+//				}
 //			}
-		}		
+//			else if(isTaxPayment())
+//			{
+//				if(dp.getDPTaxAmount().compareTo(totalAllocation.add(getAllocatedAmt()))<0)
+//				{
+//					allocationAmt = dp.getDPTaxAmount().subtract(totalAllocation);
+//				}
+//			}
+//			else if(!isTrxPayment() && !isTaxPayment())
+//			{
+//				log.saveError("Error", Msg.getMsg(getCtx(), "TrxPayment or Tax Payment must be select"));
+//				return false;
+//			}
+//		}
+//		else
+//		{
+////			totalAllocation = getAllocatedPayment(true, true);
+////			if(dp.getTotalDPAmount().compareTo(totalAllocation.add(getAllocatedAmt()))<0)
+////			{
+////				allocationAmt = dp.getTotalDPAmount().subtract(totalAllocation);
+////			}
+//		}		
 		
 		if(allocationAmt.compareTo(BigDecimal.ZERO)>0)
 			setAllocatedAmt(allocationAmt);		
-
 		// Set Converted Amount
 		BigDecimal convertedAmt = getAllocatedAmt();
 		if(getRate().compareTo(BigDecimal.ZERO)>0)
 		{
 			MCurrency currency = new MCurrency(getCtx(), getC_Currency_ID(), get_Trx());
 			convertedAmt = getAllocatedAmt().multiply(getRate()).setScale(currency.getStdPrecision(), RoundingMode.HALF_EVEN);			
-		}
+		}		
 		setConvertedAmt(convertedAmt);
 		return true;
+	}
+	
+	private boolean checkLineValidation()
+	{
+		boolean isValid = true;
+		StringBuilder sql = new StringBuilder("SELECT 1 " +
+				"FROM XX_DownPaymentPlan " +
+				"WHERE XX_DownPayment_ID = ? "
+				+ "AND PaymentRule = 'D' ");
+		
+		PreparedStatement pstmt = DB.prepareStatement(sql.toString(), get_Trx());
+		ResultSet rs = null;
+		try{
+			pstmt.setInt(1, getXX_DownPayment_ID());
+			rs = pstmt.executeQuery();
+			if(rs.next())
+				isValid = false;
+			rs.close();
+			pstmt.close();
+		}catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		return isValid;
 	}
 	
 	@Override
@@ -237,6 +302,33 @@ public class MDownPaymentPlan extends X_XX_DownPaymentPlan {
 		
 		// Add payment to allocation amount
 		return payment;
+	}
+	
+	public static MDownPayment[] unAllocatedDownPayment(Ctx ctx, int C_BPartner_ID, Trx trx)
+	{
+		ArrayList<MDownPayment> dpList = new ArrayList<>();
+		String sql = "SELECT * "
+				+ "FROM XX_DownPayment "
+				+ "WHERE DocStatus IN ('CO', 'CL') "
+				+ "AND C_BPartner_ID = ? "
+				+ "AND PayAmt > AllocatedAmt ";
+		PreparedStatement pstmt = DB.prepareStatement(sql, trx);
+		ResultSet rs = null;
+		try{
+			pstmt.setInt(1, C_BPartner_ID);
+			rs = pstmt.executeQuery();
+			while(rs.next())
+				dpList.add(new MDownPayment(ctx, rs, trx));
+			rs.close();
+			pstmt.close();
+		}catch (Exception e) {
+			// TODO: handle exception
+			e.printStackTrace();
+		}
+		
+		MDownPayment[] retValue = new MDownPayment[dpList.size()];
+		dpList.toArray(retValue);
+		return retValue;
 	}
 
 }

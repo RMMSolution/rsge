@@ -62,9 +62,9 @@ public class X_XX_DownPaymentSettlement extends PO
         
     }
     /** Serial Version No */
-    private static final long serialVersionUID = 27807792774519L;
-    /** Last Updated Timestamp 2018-05-07 11:30:57.73 */
-    public static final long updatedMS = 1525667457730L;
+    private static final long serialVersionUID = 27808136619167L;
+    /** Last Updated Timestamp 2018-05-11 11:01:42.378 */
+    public static final long updatedMS = 1526011302378L;
     /** AD_Table_ID=1000142 */
     public static final int Table_ID;
     

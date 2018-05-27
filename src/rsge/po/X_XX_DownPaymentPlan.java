@@ -62,9 +62,9 @@ public class X_XX_DownPaymentPlan extends PO
         
     }
     /** Serial Version No */
-    private static final long serialVersionUID = 27678159165789L;
-    /** Last Updated Timestamp 2014-03-29 02:10:49.0 */
-    public static final long updatedMS = 1396033849000L;
+    private static final long serialVersionUID = 27809478536641L;
+    /** Last Updated Timestamp 2018-05-26 23:46:59.852 */
+    public static final long updatedMS = 1527353219852L;
     /** AD_Table_ID=1000141 */
     public static final int Table_ID;
     
@@ -307,8 +307,8 @@ public class X_XX_DownPaymentPlan extends PO
         
     }
     
-    /** Cash = B */
-    public static final String PAYMENTRULE_Cash = X_Ref__Down_Payment_Rule.CASH.getValue();
+    /** Down Payment = D */
+    public static final String PAYMENTRULE_DownPayment = X_Ref__Down_Payment_Rule.DOWN_PAYMENT.getValue();
     /** Check = S */
     public static final String PAYMENTRULE_Check = X_Ref__Down_Payment_Rule.CHECK.getValue();
     /** Direct Deposit = T */
@@ -319,8 +319,8 @@ public class X_XX_DownPaymentPlan extends PO
     {
         if (PaymentRule == null) throw new IllegalArgumentException ("PaymentRule is mandatory");
         if (!X_Ref__Down_Payment_Rule.isValid(PaymentRule))
-        throw new IllegalArgumentException ("PaymentRule Invalid value - " + PaymentRule + " - Reference_ID=1000111 - B - S - T");
-        set_Value ("PaymentRule", PaymentRule);
+        throw new IllegalArgumentException ("PaymentRule Invalid value - " + PaymentRule + " - Reference_ID=1000111 - D - S - T");
+        set_ValueNoCheck ("PaymentRule", PaymentRule);
         
     }
     
@@ -361,6 +361,22 @@ public class X_XX_DownPaymentPlan extends PO
     public java.math.BigDecimal getRate() 
     {
         return get_ValueAsBigDecimal("Rate");
+        
+    }
+    
+    /** Set Remaining Amt.
+    @param RemainingAmt Remaining Amount */
+    public void setRemainingAmt (java.math.BigDecimal RemainingAmt)
+    {
+        set_Value ("RemainingAmt", RemainingAmt);
+        
+    }
+    
+    /** Get Remaining Amt.
+    @return Remaining Amount */
+    public java.math.BigDecimal getRemainingAmt() 
+    {
+        return get_ValueAsBigDecimal("RemainingAmt");
         
     }
     

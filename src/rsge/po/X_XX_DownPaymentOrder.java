@@ -40,6 +40,7 @@ public class X_XX_DownPaymentOrder extends PO
         {
             setC_Order_ID (0);
             setIsInvoiced (false);	// N
+            setMaxAllocationPct (Env.ZERO);	// 100
             setXX_DownPaymentOrder_ID (0);
             
         }
@@ -57,9 +58,9 @@ public class X_XX_DownPaymentOrder extends PO
         
     }
     /** Serial Version No */
-    private static final long serialVersionUID = 27806070938821L;
-    /** Last Updated Timestamp 2018-04-17 13:13:42.032 */
-    public static final long updatedMS = 1523945622032L;
+    private static final long serialVersionUID = 27809240859784L;
+    /** Last Updated Timestamp 2018-05-24 05:45:42.995 */
+    public static final long updatedMS = 1527115542995L;
     /** AD_Table_ID=1000140 */
     public static final int Table_ID;
     
@@ -160,6 +161,23 @@ public class X_XX_DownPaymentOrder extends PO
     public boolean isInvoiced() 
     {
         return get_ValueAsBoolean("IsInvoiced");
+        
+    }
+    
+    /** Set Maximum Allocation (%).
+    @param MaxAllocationPct Maximum allocation in percentage */
+    public void setMaxAllocationPct (java.math.BigDecimal MaxAllocationPct)
+    {
+        if (MaxAllocationPct == null) throw new IllegalArgumentException ("MaxAllocationPct is mandatory.");
+        set_Value ("MaxAllocationPct", MaxAllocationPct);
+        
+    }
+    
+    /** Get Maximum Allocation (%).
+    @return Maximum allocation in percentage */
+    public java.math.BigDecimal getMaxAllocationPct() 
+    {
+        return get_ValueAsBigDecimal("MaxAllocationPct");
         
     }
     

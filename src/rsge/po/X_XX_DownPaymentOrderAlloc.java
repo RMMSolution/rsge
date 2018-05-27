@@ -55,9 +55,9 @@ public class X_XX_DownPaymentOrderAlloc extends PO
         
     }
     /** Serial Version No */
-    private static final long serialVersionUID = 27807931175849L;
-    /** Last Updated Timestamp 2018-05-09 01:57:39.06 */
-    public static final long updatedMS = 1525805859060L;
+    private static final long serialVersionUID = 27809431493957L;
+    /** Last Updated Timestamp 2018-05-26 10:42:57.168 */
+    public static final long updatedMS = 1527306177168L;
     /** AD_Table_ID=1000611 */
     public static final int Table_ID;
     
@@ -93,6 +93,32 @@ public class X_XX_DownPaymentOrderAlloc extends PO
     public java.math.BigDecimal getAllocatedAmt() 
     {
         return get_ValueAsBigDecimal("AllocatedAmt");
+        
+    }
+    
+    /** Set Allocated To DP.
+    @param AllocatedDP_ID Allocated to down payment */
+    public void setAllocatedDP_ID (int AllocatedDP_ID)
+    {
+        if (AllocatedDP_ID <= 0) set_Value ("AllocatedDP_ID", null);
+        else
+        set_Value ("AllocatedDP_ID", Integer.valueOf(AllocatedDP_ID));
+        
+    }
+    
+    /** Get Allocated To DP.
+    @return Allocated to down payment */
+    public int getAllocatedDP_ID() 
+    {
+        return get_ValueAsInt("AllocatedDP_ID");
+        
+    }
+    
+    /** Get Record ID/ColumnName
+    @return ID/ColumnName pair */
+    public KeyNamePair getKeyNamePair() 
+    {
+        return new KeyNamePair(get_ID(), String.valueOf(getAllocatedDP_ID()));
         
     }
     

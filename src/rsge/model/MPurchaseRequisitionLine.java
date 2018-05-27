@@ -183,7 +183,6 @@ public class MPurchaseRequisitionLine extends X_XX_PurchaseRequisitionLine {
 						{
 							bc.calculateUsedAmt();
 							BigDecimal remains = bc.getBudgetAmt().subtract(bc.getUsedAmt());
-							System.out.println("Remains " + remains);
 							setRemainingBudget(remains);
 							
 							// Check Over Budget

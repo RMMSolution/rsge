@@ -117,8 +117,9 @@ public class MDownPaymentOrderAlloc extends X_XX_DownPaymentOrderAlloc {
 		MDownPaymentOrderAlloc retValue = null;
 		StringBuilder sql = new StringBuilder("SELECT oa.* FROM XX_DownPaymentOrderAlloc oa "
 				+ "INNER JOIN XX_DownPaymentOrder dpo ON oa.XX_DownPaymentOrder_ID = dpo.XX_DownPaymentOrder_ID "
-				+ "WHERE dpo.C_Order_ID = ? ");
-		sql.append("AND oa.C_Invoice_ID = ? ");
+				+ "WHERE dpo.C_Order_ID = ? "
+				+ "AND oa.C_Invoice_ID = ? "
+				+ "AND dpo.XX_DownPaymentOrder_ID = ? ");
 
 		PreparedStatement pstmt = DB.prepareStatement(sql.toString(), dpo.get_Trx());
 		ResultSet rs = null;
@@ -126,6 +127,7 @@ public class MDownPaymentOrderAlloc extends X_XX_DownPaymentOrderAlloc {
 			int index = 1;
 			pstmt.setInt(index++, dpo.getC_Order_ID());
 			pstmt.setInt(index++, C_Invoice_ID);
+			pstmt.setInt(index++, dpo.getXX_DownPaymentOrder_ID());
 			rs = pstmt.executeQuery();
 			if(rs.next())
 				retValue = new MDownPaymentOrderAlloc(dpo.getCtx(), rs, dpo.get_Trx());
